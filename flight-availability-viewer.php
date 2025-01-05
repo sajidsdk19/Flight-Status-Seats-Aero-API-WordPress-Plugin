@@ -2,7 +2,7 @@
 /*
 Plugin Name: Flight Availability Viewer with Continent Filter
 Description: Fetches and displays flight availability between continents using a specified API with authorization.
-Version: 1.2
+Version: 1.5
 Author: Sajid Khan
 */
 
@@ -78,10 +78,12 @@ function render_flight_availability_page()
 
             if ($source && $destination) {
                 $flights = fetch_flight_availability($source, $destination);
-                echo '<h2>Results</h2>';
-                echo '<textarea rows="10" cols="80" readonly>';
-                echo esc_html($flights);
-                echo '</textarea>';
+                if ($flights) {
+                    echo '<h2>Flight Results</h2>';
+                    echo render_dynamic_flight_table($flights);
+                } else {
+                    echo '<p style="color: red;">No flights found or an error occurred.</p>';
+                }
             } else {
                 echo '<p style="color: red;">Please select both source and destination continents.</p>';
             }
@@ -101,7 +103,6 @@ function fetch_flight_availability($source, $destination)
     $client = new \GuzzleHttp\Client();
 
     try {
-        // API call with source and destination as parameters (assuming API supports filtering by continents).
         $response = $client->request('GET', 'https://seats.aero/partnerapi/availability', [
             'headers' => [
                 'Partner-Authorization' => 'pro_2r8UqUIxUrqzWjopSIsV0moMlpA',
@@ -115,8 +116,46 @@ function fetch_flight_availability($source, $destination)
             ],
         ]);
 
-        return $response->getBody();
+        return json_decode($response->getBody(), true);
     } catch (\Exception $e) {
-        return 'Error fetching flight data: ' . $e->getMessage();
+        return null;
     }
+}
+
+// Render the flight data dynamically as an HTML table.
+function render_dynamic_flight_table($flights)
+{
+    if (empty($flights) || !isset($flights['data']) || empty($flights['data'])) {
+        return '<p>No flights available for the selected criteria.</p>';
+    }
+
+    // Extract the keys from the first flight record to generate dynamic headers.
+    $first_flight = $flights['data'][0];
+    $headers = array_keys($first_flight);
+
+    $html = '<div style="overflow-x:auto;">';
+    $html .= '<table class="widefat fixed striped" style="border-collapse: collapse; width: 100%; text-align: left; border: 1px solid #ddd;">';
+
+    // Render table header
+    $html .= '<thead><tr style="background-color: #f2f2f2;">';
+    foreach ($headers as $header) {
+        $html .= '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">' . esc_html(ucwords(str_replace('_', ' ', $header))) . '</th>';
+    }
+    $html .= '</tr></thead>';
+
+    // Render table body
+    $html .= '<tbody>';
+    foreach ($flights['data'] as $flight) {
+        $html .= '<tr style="border-bottom: 1px solid #ddd;">';
+        foreach ($headers as $header) {
+            $value = is_array($flight[$header]) ? implode(', ', $flight[$header]) : ($flight[$header] ?? 'N/A');
+            $html .= '<td style="padding: 10px; word-wrap: break-word; max-width: 200px; border: 1px solid #ddd;">' . esc_html($value) . '</td>';
+        }
+        $html .= '</tr>';
+    }
+    $html .= '</tbody>';
+
+    $html .= '</table></div>';
+
+    return $html;
 }
