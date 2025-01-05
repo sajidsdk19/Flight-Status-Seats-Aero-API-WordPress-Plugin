@@ -2,7 +2,7 @@
 /*
 Plugin Name: Flight Availability Viewer with Continent Filter
 Description: Fetches and displays flight availability between continents using a specified API with authorization.
-Version: 1.5
+Version: 2.0
 Author: Sajid Khan
 */
 
@@ -23,6 +23,9 @@ add_action('admin_menu', function () {
     );
 });
 
+// Register the shortcode for Elementor and front-end use.
+add_shortcode('flight_availability', 'render_flight_availability_page');
+
 // Render the plugin settings page.
 function render_flight_availability_page()
 {
@@ -35,49 +38,40 @@ function render_flight_availability_page()
         'Oceania',
         'Antarctica'
     ];
+
+    // Get previously submitted values.
+    $selected_source = isset($_POST['source_continent']) ? sanitize_text_field($_POST['source_continent']) : '';
+    $selected_destination = isset($_POST['destination_continent']) ? sanitize_text_field($_POST['destination_continent']) : '';
+
+    ob_start();
     ?>
     <div class="wrap">
         <h1>Flight Availability Viewer</h1>
         <form method="post" action="">
-            <table class="form-table">
-                <tr>
-                    <th><label for="source_continent">Source Continent:</label></th>
-                    <td>
-                        <select name="source_continent" id="source_continent" required>
-                            <option value="">Select a continent</option>
-                            <?php foreach ($continents as $continent): ?>
-                                <option value="<?php echo esc_attr($continent); ?>">
-                                    <?php echo esc_html($continent); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <th><label for="destination_continent">Destination Continent:</label></th>
-                    <td>
-                        <select name="destination_continent" id="destination_continent" required>
-                            <option value="">Select a continent</option>
-                            <?php foreach ($continents as $continent): ?>
-                                <option value="<?php echo esc_attr($continent); ?>">
-                                    <?php echo esc_html($continent); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </td>
-                </tr>
-            </table>
-            <p>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select name="source_continent" id="source_continent" required>
+                    <option value="">Select Source Continent</option>
+                    <?php foreach ($continents as $continent): ?>
+                        <option value="<?php echo esc_attr($continent); ?>" <?php selected($selected_source, $continent); ?>>
+                            <?php echo esc_html($continent); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="destination_continent" id="destination_continent" required>
+                    <option value="">Select Destination Continent</option>
+                    <?php foreach ($continents as $continent): ?>
+                        <option value="<?php echo esc_attr($continent); ?>" <?php selected($selected_destination, $continent); ?>>
+                            <?php echo esc_html($continent); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit" name="search_flights" class="button button-primary">Search Flights</button>
-            </p>
+            </div>
         </form>
         <?php
         if (isset($_POST['search_flights'])) {
-            $source = sanitize_text_field($_POST['source_continent']);
-            $destination = sanitize_text_field($_POST['destination_continent']);
-
-            if ($source && $destination) {
-                $flights = fetch_flight_availability($source, $destination);
+            if ($selected_source && $selected_destination) {
+                $flights = fetch_flight_availability($selected_source, $selected_destination);
                 if ($flights) {
                     echo '<h2>Flight Results</h2>';
                     echo render_dynamic_flight_table($flights);
@@ -91,6 +85,7 @@ function render_flight_availability_page()
         ?>
     </div>
     <?php
+    return ob_get_clean();
 }
 
 // Fetch flight availability using the API with continent filtering.
